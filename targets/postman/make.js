@@ -25,7 +25,8 @@ exports.makeCombinedAPI = function (apis, sourceDir, apiOutputDir) {
         getPostmanHeader: getPostmanHeader,
         getRequestExample: getRequestExample,
         getUrl: getUrl,
-        getVerticalTag: getVerticalTag
+        getVerticalTag: getVerticalTag,
+        getTestScripts: getTestScripts,
     };
 
     var outputFile = path.resolve(apiOutputDir, "playfab.json");
@@ -97,7 +98,7 @@ function getPostmanDescription(api, apiCall) {
 
     output += jsonEscape(apiCall.summary); // Make sure quote characters are properly escaped
     if (!isProposed)
-        output += "\\n\\nApi Documentation: https://docs.microsoft.com/rest/api/playfab/" + api.name.toLowerCase() + "/" + apiCall.subgroup.toLowerCase().replaceAll(" ","-") + "/" + apiCall.name.toLowerCase();
+        output += "\\n\\nApi Documentation: https://docs.microsoft.com/rest/api/playfab/" + api.name.toLowerCase() + "/" + apiCall.subgroup.toLowerCase().replaceAll(" ", "-") + "/" + apiCall.name.toLowerCase();
 
     output += "\\n\\n**The following case-sensitive environment variables are required for this call:**";
     output += "\\n\\n\\\"TitleId\\\" - The Title Id of your game, available in the Game Manager (https://developer.playfab.com)";
@@ -153,6 +154,43 @@ function checkReplacements(api, obj) {
 
 function getRequestExample(api, apiCall) {
     var msg = null;
+    var egJSONStr = "";
+    switch (api.name.toLowerCase() + "-" + apiCall.name) {
+        case "client-LoginWithEmailAddress":
+            msg = "{\n  \"Email\": \"{{PFEmail}}\",\n  \"Password\": \"{{PFPsd}}\",\n  \"TitleId\": \"{{TitleId}}\"\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        case "multiplayer-CreateMatchmakingTicket":
+            msg = "{\n  \"Creator\": {\n  \t\"Attributes\":{\n  \t\t\"DataObject\": {\n  \t\t\t\"Team\" : \"TeamA\",\n  \t\t\t\"Latency\": [\n  \t\t\t{\"region\": \"EastUs\",\"latency\": 400},\n  \t\t\t{\"region\": \"WestUs\",\"latency\": 100}\n  \t\t\t]\n  \t\t}\n  \t},\n  \t\"Entity\":{\n  \t\t\"Id\":\"{{PlayerEntityId}}\",\n  \t\t\"Type\":\"title_player_account\"\n  \t}\n  },\n  \"MembersToMatchWith\": [],\n  \"GiveUpAfterSeconds\": 300,\n  \"QueueName\": \"{{MatchQueue}}\"\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        case "multiplayer-CancelAllMatchmakingTicketsForPlayer":
+            msg = "{\n  \"Entity\": {\n    \"Id\": \"{{PlayerEntityId}}\",\n    \"Type\": \"title_player_account\",\n    \"TypeString\": \"title_player_account\"\n  },\n  \"QueueName\": \"{{MatchQueue}}\"\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        case "multiplayer-CancelMatchmakingTicket":
+            msg = "{\n  \"TicketId\": \"{{MatchmakingTicketId}}\",\n  \"QueueName\": \"{{MatchQueue}}\"\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        case "multiplayer-GetMatchmakingTicket":
+            msg = "{\n  \"TicketId\": \"{{MatchmakingTicketId}}\",\n  \"QueueName\": \"{{MatchQueue}}\",\n  \"EscapeObject\": false\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        case "multiplayer-JoinMatchmakingTicket":
+            msg = "{\n  \"TicketId\": \"{{MatchmakingTicketId}}\",\n  \"QueueName\": \"{{MatchQueue}}\",\n  \"Member\": {\n  \t\"Attributes\":{\n  \t\t\"DataObject\": {\n  \t\t\t\"Team\" : \"TeamA\",\n  \t\t\t\"Latency\": [\n  \t\t\t{\"region\": \"EastUs\",\"latency\": 400},\n  \t\t\t{\"region\": \"WestUs\",\"latency\": 100}\n  \t\t\t]\n  \t\t}\n  \t},\n  \t\"Entity\":{\n  \t\t\"Id\":\"{{PlayerEntityId}}\",\n  \t\t\"Type\":\"title_player_account\"\n  \t}\n  }\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        case "multiplayer-ListMatchmakingTicketsForPlayer":
+            msg = "{\n  \"Entity\": {\n    \"Id\": \"{{PlayerEntityId}}\",\n    \"Type\": \"title_player_account\",\n    \"TypeString\": \"title_player_account\"\n  },\n  \"QueueName\": \"{{MatchQueue}}\"\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        case "cloudscript-ExecuteFunction":
+            msg = "{\n  \"FunctionName\": \"HttpTriggerTest\",\n  \"FunctionParameter\": {\n    \"name\": \"UserA\",\n    },\n  \"GeneratePlayStreamEvent\": true,\n  \"Entity\": {\n    \"Id\": \"{{PlayerEntityId}}\",\n    \"Type\": \"title_player_account\",\n    \"TypeString\": \"title_player_account\"\n  }\n}";
+            return JSON.stringify(msg, null, 2);
+            break;
+        default:
+    }
+
     if (apiCall.requestExample.length > 0 && apiCall.requestExample.indexOf("{") >= 0) {
         if (apiCall.requestExample.indexOf("\\\"") === -1) // I can't handle json in a string in json in a string...
             return getCorrectedRequestExample(api, apiCall);
@@ -178,3 +216,103 @@ function getVerticalTag() {
         return " for vertical: " + sdkGlobals.verticalName;
     return "";
 }
+
+function getTestScripts(apiName, apiCall) {
+    var output = "";
+    var eventJSONStr = "";
+    switch (apiName + "-" + apiCall.name) {
+        case "client-LoginWithEmailAddress":
+            var obj = {
+                "listen": "test",
+                "script": {
+                    "id": "49915f32-fe73-4415-80b0-0fdefb1e931d",
+                    "exec": [
+                        "var jsonData = JSON.parse(responseBody);\r",
+                        "postman.setEnvironmentVariable(\"SessionTicket\", jsonData.data.SessionTicket);\r",
+                        "postman.setEnvironmentVariable(\"EntityToken\", jsonData.data.EntityToken.EntityToken);\r",
+                        "postman.setEnvironmentVariable(\"PlayFabId\", jsonData.data.PlayFabId);\r",
+                        "postman.setEnvironmentVariable(\"PlayerEntityId\", jsonData.data.EntityToken.Entity.Id);\r",
+                        "postman.setEnvironmentVariable(\"PlayerEntityType\", jsonData.data.EntityToken.Entity.Type);"
+                    ],
+                    "type": "text/javascript"
+                }
+            };
+            eventJSONStr = JSON.stringify(obj);
+            break;
+        case "client-LoginWithCustomID":
+            var obj = {
+                "listen": "test",
+                "script": {
+                    "id": "1f85969a-d922-4ee9-bdf6-dfa2a149ea07",
+                    "exec": [
+                        "var jsonData = JSON.parse(responseBody);\r",
+                        "postman.setEnvironmentVariable(\"SessionTicket\", jsonData.data.SessionTicket);\r",
+                        "postman.setEnvironmentVariable(\"EntityToken\", jsonData.data.EntityToken.EntityToken);\r",
+                        "postman.setEnvironmentVariable(\"PlayFabId\", jsonData.data.PlayFabId);\r",
+                        "postman.setEnvironmentVariable(\"PlayerEntityId\", jsonData.data.EntityToken.Entity.Id);\r",
+                        "postman.setEnvironmentVariable(\"PlayerEntityType\", jsonData.data.EntityToken.Entity.Type);"
+                    ],
+                    "type": "text/javascript"
+                }
+            };
+            eventJSONStr = JSON.stringify(obj);
+            break;
+        case "authentication-GetEntityToken":
+            var obj = {
+                "listen": "test",
+                "script": {
+                    "id": "368c1521-b16e-476b-9ff6-562126a4c211",
+                    "exec": [
+                        "var jsonData = JSON.parse(responseBody);\r",
+                        "postman.setEnvironmentVariable(\"EntityToken\", jsonData.data.EntityToken);"
+                    ],
+                    "type": "text/javascript"
+                }
+            };
+            eventJSONStr = JSON.stringify(obj);
+            break;
+        case "multiplayer-CreateMatchmakingTicket":
+            var obj = {
+                "listen": "test",
+                "script": {
+                    "id": "836444a6-3b38-4506-b91f-11f1049a726a",
+                    "exec": [
+                        "var jsonData = JSON.parse(responseBody);\r",
+                        "postman.setEnvironmentVariable(\"MatchmakingTicketId\", jsonData.data.TicketId);"
+                    ],
+                    "type": "text/javascript"
+                }
+            };
+            eventJSONStr = JSON.stringify(obj);
+            break;
+        case "multiplayer-GetMatchmakingTicket":
+            var obj = {
+                "listen": "test",
+                "script": {
+                    "id": "244e7c08-46ef-4992-bf31-cc7a53e0b35a",
+                    "exec": [
+                        "var jsonData = JSON.parse(responseBody);\r",
+                        "postman.setEnvironmentVariable(\"MatchId\", jsonData.data.MatchId);"
+                    ],
+                    "type": "text/javascript"
+                }
+            };
+            eventJSONStr = JSON.stringify(obj);
+            break;
+        default:
+    }
+    if (eventJSONStr)
+        output = eventJSONStr.escapeSpecialChars();
+    return output;
+}
+
+String.prototype.escapeSpecialChars = function () {
+    return this.replace(/\\n/g, "\\n")
+        .replace(/\\'/g, "\\'")
+        .replace(/\\"/g, '\\"')
+        .replace(/\\&/g, "\\&")
+        .replace(/\\r/g, "\\r")
+        .replace(/\\t/g, "\\t")
+        .replace(/\\b/g, "\\b")
+        .replace(/\\f/g, "\\f");
+};
