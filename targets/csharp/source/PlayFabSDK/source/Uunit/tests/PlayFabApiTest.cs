@@ -46,6 +46,7 @@ namespace PlayFab.UUnit
 
         public override void SetUp(UUnitTestContext testContext)
         {
+            maxRetry = 1;
             if (!TITLE_INFO_SET)
                 testContext.Skip(); // We cannot do client tests if the titleId is not given
         }
@@ -78,7 +79,7 @@ namespace PlayFab.UUnit
             testContext.NotNull(loginResult, failMessage);
             testContext.IsNull(loginResult.Result, failMessage);
             testContext.NotNull(loginResult.Error, failMessage);
-            testContext.True(loginResult.Error.ErrorMessage.Contains("password"), loginResult.Error.ErrorMessage + ", for: " + testTitleData.userEmail + ", on: " + PlayFabSettings.staticSettings.TitleId);
+            testContext.True(loginResult.Error.GenerateErrorReport().Contains("RequestId") && loginResult.Error.ErrorMessage.Contains("password"), loginResult.Error.ErrorMessage + ", for: "+ testTitleData.userEmail + ", on: " + PlayFabSettings.staticSettings.TitleId);
         }
 
         /// <summary>
@@ -596,7 +597,6 @@ namespace PlayFab.UUnit
                 }
             });
         }
-
     }
 }
 
